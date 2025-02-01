@@ -23,39 +23,54 @@ interface CryptoData {
   };
 }
 
+type TimeFrame = '1D' | '7D' | '30D';
+
+const TIME_FRAMES: { [key in TimeFrame]: { days: string; label: string } } = {
+  '1D': { days: '1', label: '1 Día' },
+  '7D': { days: '7', label: '7 Días' },
+  '30D': { days: '30', label: '30 Días' }
+};
+
 export default function CryptoPage() {
   const [cryptoData, setCryptoData] = useState<CryptoData[]>([]);
+  const [timeFrame, setTimeFrame] = useState<TimeFrame>('7D');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch(
-          'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=10&page=1&sparkline=true'
-        );
-        
-        if (!response.ok) {
-          throw new Error('Network response was not ok');
+  const fetchData = async (selectedTimeFrame: TimeFrame) => {
+    try {
+      setLoading(true);
+      const { days } = TIME_FRAMES[selectedTimeFrame];
+      const response = await fetch(
+        `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=10&page=1&sparkline=true&days=${days}`,
+        {
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          }
         }
-        
-        const data = await response.json();
-        console.log('Fetched data:', data); // Para debugging
-        setCryptoData(data);
-        setError(null);
-      } catch (err) {
-        console.error('Error fetching data:', err);
-        setError('Error al cargar los datos');
-      } finally {
-        setLoading(false);
+      );
+      
+      if (!response.ok) {
+        throw new Error('Error al obtener datos de la API');
       }
-    };
+      
+      const data = await response.json();
+      setCryptoData(data);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching data:', err);
+      setError('Error al cargar los datos');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    fetchData();
-    const interval = setInterval(fetchData, 60000);
+  useEffect(() => {
+    fetchData(timeFrame);
+    const interval = setInterval(() => fetchData(timeFrame), 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [timeFrame]);
 
   const formatPrice = (value: number) => {
     if (value >= 1000) {
@@ -65,6 +80,20 @@ export default function CryptoPage() {
     } else {
       return `$${value.toFixed(6)}`;
     }
+  };
+
+  const formatDate = (index: number, totalPoints: number) => {
+    const date = new Date();
+    const days = parseInt(TIME_FRAMES[timeFrame].days);
+    const timeIncrement = (days * 24 * 60 * 60 * 1000) / totalPoints;
+    date.setTime(date.getTime() - (totalPoints - index) * timeIncrement);
+    
+    return new Intl.DateTimeFormat('es-ES', {
+      hour: days <= 1 ? '2-digit' : undefined,
+      minute: days <= 1 ? '2-digit' : undefined,
+      day: '2-digit',
+      month: 'short',
+    }).format(date);
   };
 
   if (loading) {
@@ -89,11 +118,27 @@ export default function CryptoPage() {
       <h1 className="text-4xl font-bold text-blue-400 mb-8 text-center">
         Crypto Dashboard
       </h1>
+
+      <div className="flex justify-center gap-4 mb-8">
+        {(Object.keys(TIME_FRAMES) as TimeFrame[]).map((tf) => (
+          <Button
+            key={tf}
+            onClick={() => setTimeFrame(tf)}
+            variant={timeFrame === tf ? "default" : "outline"}
+            className={`${
+              timeFrame === tf ? 'bg-blue-600' : 'text-blue-400'
+            } min-w-[100px]`}
+          >
+            {TIME_FRAMES[tf].label}
+          </Button>
+        ))}
+      </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {cryptoData.map((crypto) => {
-          const chartData = crypto.sparkline_in_7d.price.map((price, index) => ({
-            time: index,
+          const prices = crypto.sparkline_in_7d.price;
+          const chartData = prices.map((price, index) => ({
+            time: formatDate(index, prices.length),
             price: price
           }));
 
@@ -136,11 +181,19 @@ export default function CryptoPage() {
                         strokeWidth={2}
                         dot={false}
                       />
-                      <XAxis dataKey="time" hide />
+                      <XAxis 
+                        dataKey="time"
+                        tick={{ fill: '#93C5FD', fontSize: 10 }}
+                        interval={Math.floor(chartData.length / 5)}
+                        angle={-45}
+                        textAnchor="end"
+                        height={50}
+                      />
                       <YAxis
                         orientation="right"
                         tick={{ fill: '#93C5FD' }}
                         tickFormatter={formatPrice}
+                        width={80}
                       />
                       <Tooltip
                         formatter={(value: number) => [formatPrice(value), 'Precio']}
@@ -148,8 +201,8 @@ export default function CryptoPage() {
                           backgroundColor: 'rgba(30, 58, 138, 0.9)',
                           border: '1px solid rgba(96, 165, 250, 0.3)',
                           borderRadius: '8px',
+                          color: '#93C5FD'
                         }}
-                        labelStyle={{ color: '#93C5FD' }}
                       />
                     </LineChart>
                   </ResponsiveContainer>
