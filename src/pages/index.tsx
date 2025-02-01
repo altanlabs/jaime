@@ -28,9 +28,16 @@ interface ChartData {
   timestamp: string;
 }
 
+interface SelectedPoints {
+  [key: string]: {
+    start: number;
+    end: number;
+  } | undefined;
+}
+
 export default function CryptoPage() {
   const [cryptoData, setCryptoData] = useState<CryptoData[]>([]);
-  const [selectedPoints, setSelectedPoints] = useState<{ [key: string]: { start: number | null; end: number | null } }>({});
+  const [selectedPoints, setSelectedPoints] = useState<SelectedPoints>({});
 
   useEffect(() => {
     const fetchData = async () => {
@@ -53,15 +60,15 @@ export default function CryptoPage() {
   const handleMouseDown = (cryptoId: string, value: number) => {
     setSelectedPoints(prev => ({
       ...prev,
-      [cryptoId]: { start: value, end: null }
+      [cryptoId]: { start: value, end: value }
     }));
   };
 
   const handleMouseMove = (cryptoId: string, value: number) => {
-    if (selectedPoints[cryptoId]?.start !== null) {
+    if (selectedPoints[cryptoId]) {
       setSelectedPoints(prev => ({
         ...prev,
-        [cryptoId]: { ...prev[cryptoId], end: value }
+        [cryptoId]: { ...prev[cryptoId]!, end: value }
       }));
     }
   };
@@ -89,7 +96,7 @@ export default function CryptoPage() {
         <div className="bg-blue-900/90 p-4 rounded-lg shadow-lg border border-blue-500/30">
           <p className="text-blue-200">Precio: ${currentValue.toFixed(2)}</p>
           <p className="text-blue-200">Fecha: {formatTimestamp(payload[0].payload.index)}</p>
-          {selectedRange?.start && selectedRange?.end && (
+          {selectedRange && (
             <p className="text-blue-200">
               Cambio: {calculateGrowth(selectedRange.start, selectedRange.end)}%
             </p>
@@ -115,6 +122,8 @@ export default function CryptoPage() {
             index,
             timestamp: formatTimestamp(index),
           }));
+
+          const selected = selectedPoints[crypto.id];
 
           return (
             <motion.div
@@ -168,26 +177,26 @@ export default function CryptoPage() {
                       <Tooltip
                         content={<CustomTooltip cryptoId={crypto.id} />}
                       />
-                      {selectedPoints[crypto.id]?.start && (
-                        <ReferenceLine
-                          y={selectedPoints[crypto.id].start}
-                          stroke="#60A5FA"
-                          strokeDasharray="3 3"
-                        />
-                      )}
-                      {selectedPoints[crypto.id]?.end && (
-                        <ReferenceLine
-                          y={selectedPoints[crypto.id].end}
-                          stroke="#60A5FA"
-                          strokeDasharray="3 3"
-                        />
+                      {selected && (
+                        <>
+                          <ReferenceLine
+                            y={selected.start}
+                            stroke="#60A5FA"
+                            strokeDasharray="3 3"
+                          />
+                          <ReferenceLine
+                            y={selected.end}
+                            stroke="#60A5FA"
+                            strokeDasharray="3 3"
+                          />
+                        </>
                       )}
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
-                {selectedPoints[crypto.id]?.start && selectedPoints[crypto.id]?.end && (
+                {selected && (
                   <div className="mt-4 text-center text-blue-300">
-                    Crecimiento: {calculateGrowth(selectedPoints[crypto.id].start!, selectedPoints[crypto.id].end!)}%
+                    Crecimiento: {calculateGrowth(selected.start, selected.end)}%
                   </div>
                 )}
               </Card>
