@@ -96,6 +96,13 @@ export default function CryptoPage() {
     }).format(date);
   };
 
+  const calculateYDomain = (prices: number[]) => {
+    const min = Math.min(...prices);
+    const max = Math.max(...prices);
+    const padding = (max - min) * 0.1;
+    return [min - padding, max + padding];
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-blue-950 to-black p-6 flex items-center justify-center">
@@ -137,6 +144,7 @@ export default function CryptoPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {cryptoData.map((crypto) => {
           const prices = crypto.sparkline_in_7d.price;
+          const yDomain = calculateYDomain(prices);
           const chartData = prices.map((price, index) => ({
             time: formatDate(index, prices.length),
             price: price
@@ -191,6 +199,7 @@ export default function CryptoPage() {
                       />
                       <YAxis
                         orientation="right"
+                        domain={yDomain}
                         tick={{ fill: '#93C5FD' }}
                         tickFormatter={formatPrice}
                         width={80}
@@ -203,6 +212,7 @@ export default function CryptoPage() {
                           borderRadius: '8px',
                           color: '#93C5FD'
                         }}
+                        labelStyle={{ color: '#93C5FD' }}
                       />
                     </LineChart>
                   </ResponsiveContainer>
